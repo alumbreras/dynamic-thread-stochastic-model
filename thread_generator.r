@@ -3,61 +3,70 @@
 ################################
 
 library(igraph)
+source('R/plotting.r')
 
-gen.thread <- function(n=100, alpha=0, beta=0, lambda=0){
-  # Generate artifitial thread
-  # Combines attractiveness to degree (preferential attachment), depth and recency.
+gen.thread <- function(n=100, alpha.root=1, alpha.c = 1, beta.root = 1){
+  # Generate synthetic thread according to Gomez 2010
   # Args:
+  #    n: number of posts
   #    alpha:  preferential attachement exponent
-  #    beta: chaining exponent
-  #    lambda: aging exponent
-  #
-  # See also: sample_pa_age() in igraph 1.0. http://igraph.org/r/doc/igraph.pdf
+  #    beta: root bias
   g <- graph.empty(n=1)
-  V(g)$time[1] <- 0
   
-  for (i in 2:n){
+  # First post has no choice
+  g <- add_vertices(g, 1)
+  g <- add_edges(g, c(2,1))
+  
+  for (i in 3:n){
+    alphas <- c(alpha.root, rep(alpha.c, i-2))
+    betas <- c(beta.root, rep(1, i-2))
+    popularities <- 1 + degree(g, mode="in")
     
-    # Probability pf choosing every node (only one is chosen)
-    taus <- i - V(g)$time
-    indegrees <- degree(g, mode="in")
-    depths <- as.numeric(distances(g, v=V(g), to=1, mode="out"))
-    probs <- (indegrees+10e-3)^alpha * (depths+10e-3)^beta * taus^(-lambda) 
-    #probs <- (indegrees+10e-3)^alpha * (depths+10e-3)^beta * lambda^(taus) # too much cascades
+    # Probability of choosing every node (only one is chosen)
+    #probs <- (popularities+10e-3)^alphas * (depths+10e-3)^beta * taus^(-lambda)
+    probs <- (betas*popularities)^alphas
     probs <- probs/sum(probs)
     j <- sample(1:length(probs), 1, prob=probs)
     
     # Add new vertex attached to the chosen node
-    g <- add_vertices(g, 1, time=i)
+    g <- add_vertices(g, 1)
     g <- add_edges(g, c(i,j))
   } 
   g
 }
 
 if(TRUE){
-  par(mfrow=c(1,1))
-  for (i in seq(0,1,length=12)){
-    alpha <- runif(1)
-    beta <- runif(1)
-    lambda <- runif(1)
-    alpha <- 0.75
-    beta <- 0.1
-    lambda <- 0.1
-    g <- gen.thread(n=100, alpha=alpha, beta=beta, lambda=lambda)
-    # Plot
-    la <- layout_with_fr(g)
-    plot(as.undirected(g),
-         layout = la, 
-         vertex.label = "",
-         vertex.color = "black",
-         vertex.size = 1.5 + 1.5 * log( graph.strength(g), 3 ), 
-         edge.width = 1.5, 
-         asp=9/16,
-         margin=-0.15)
-    #title(bquote(alpha ~ '=' ~ .(round(alpha, digits=2)) ~ ';' ~
-    #             beta ~ '=' ~ .(round(beta, digits=2)) ~ ';' ~ 
-    #             lambda ~ '=' ~ .(round(lambda, digits=2))
-    #            )
-    #      )
+  # Values reported in Gomze 2010 (Table 2)
+  # Slashdot: 
+  alpha.root <- 0.734
+  alpha.c <- 0.683
+  beta.root <- 1.302
+  
+  # Barrapunto
+  alpha.root <- 0.665
+  alpha.c <- -0.116
+  beta.root <- 0.781
+  
+  # Meneame
+  alpha.root <- 0.856
+  alpha.c <- 0.196
+  beta.root <- 1.588
+  
+  # Wikipedia
+  alpha.root <- 0.884
+  alpha.c <- -1.684
+  beta.root <- 0.794
+  
+  par(mfrow=c(2,2))
+  for (i in 1:4){
+    g <- gen.thread(n=100, alpha.root=alpha.root, alpha.c=alpha.c, beta.root=beta.root)
+    root = which(degree(g, mode='out')==0)
+    V(g)$color <- 'black'
+    V(g)$color[root] <- 'red'
+    V(g)$size <- 1
+    V(g)$size[root] <- 3
+    g.un <- as.undirected(g)
+    la = layout_with_fr(g.un)
+    plot(g.un, layout = la, vertex.label = NA, edge.arrow.size=0.6)
   }
 }
