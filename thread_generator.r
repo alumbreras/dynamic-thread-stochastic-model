@@ -23,7 +23,6 @@ gen.thread <- function(n=100, alpha.root=1, alpha.c = 1, beta.root = 1){
     popularities <- 1 + degree(g, mode="in")
     
     # Probability of choosing every node (only one is chosen)
-    #probs <- (popularities+10e-3)^alphas * (depths+10e-3)^beta * taus^(-lambda)
     probs <- (betas*popularities)^alphas
     probs <- probs/sum(probs)
     j <- sample(1:length(probs), 1, prob=probs)
