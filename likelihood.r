@@ -33,7 +33,7 @@ likelihood.Gomez2013 <- function(trees, alpha=1, beta = 1, tau = 0.75){
   like/length(trees)
 }
 
-if(TRUE){
+if(FALSE){
   load('trees.Rda')
   alpha <- 1 # 1
   beta <- 0.68 # 0.68
@@ -45,3 +45,16 @@ if(TRUE){
   cat('\n tau:', tau)
   cat('\n Total likelihood: ', like)
 }
+
+if(TRUE){
+  library(neldermead)
+  
+  cost.function <- function(x){
+    -likelihood.Gomez2013(trees, alpha=x[1], beta=x[2], tau=x[3]) 
+  }
+   
+  load('trees.Rda')
+  sol <- fminsearch(fun = cost.function, x0 = c(0.5,0.5,0.5), verbose=FALSE)
+}
+
+
