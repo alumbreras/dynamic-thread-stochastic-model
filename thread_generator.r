@@ -75,7 +75,7 @@ if(FALSE){
   alpha <- 1
   beta <- 0.68
   tau <- 0.75
-  trees <- replicate(n,  gen.thread.Gomez2013(n=100, alpha=alpha, beta=beta, tau=tau), simplify = FALSE)
+  trees <- replicate(1000,  gen.thread.Gomez2013(n=100, alpha=alpha, beta=beta, tau=tau), simplify = FALSE)
   
   save(trees, file='trees.Rda')
 }
