@@ -1,12 +1,11 @@
 # Generates artificial threads with models of Gomez 2010 and Gomez 2013
 # author: Alberto Lumbreras
 ################################
-
 library(igraph)
 source('R/plotting.r')
 
-gen.thread <- function(n=100, alpha.root=1, alpha.c = 1, beta.root = 1){
-  # Generate synthetic thread according to Gomez 2010
+gen.thread.Gomez2011 <- function(n=100, alpha.root=1, alpha.c = 1, beta.root = 1){
+  # Generate synthetic thread according to Gomez 2011
   # Args:
   #    n: number of posts
   #    alpha:  preferential attachement exponent
@@ -34,7 +33,55 @@ gen.thread <- function(n=100, alpha.root=1, alpha.c = 1, beta.root = 1){
   g
 }
 
-if(TRUE){
+
+gen.thread.Gomez2013 <- function(n=100, alpha=1, beta = 1, tau=0.75){
+  # Generate synthetic thread according to Gomez 2011
+  # Args:
+  #    n: number of posts
+  #    alpha:  preferential attachement exponent
+  #    beta: root bias
+  g <- graph.empty(n=1)
+  
+  # First post has no choice
+  g <- add_vertices(g, 1)
+  g <- add_edges(g, c(2,1))
+  
+  for (i in 3:n){
+    betas <- c(beta, rep(0, i-2))
+    lags <- (i-1):1
+    popularities <- 1 + degree(g, mode="in")
+    
+    # Probability of choosing every node (only one is chosen)
+    probs <- alpha*popularities + betas + tau^lags
+    probs <- probs/sum(probs)
+    j <- sample(1:length(probs), 1, prob=probs)
+    
+    # Add new vertex attached to the chosen node
+    g <- add_vertices(g, 1)
+    g <- add_edges(g, c(i,j))
+  } 
+  g
+}
+
+if(FALSE){
+  # Generate a synthetic dataset of trees
+  n <- 100
+  # Slashdot: 
+  alpha.root <- 0.734
+  alpha.c <- 0.683
+  beta.root <- 1.302
+  #trees <- replicate(n,  gen.thread(n=20, alpha.root=alpha.root, alpha.c=alpha.c, beta.root=beta.root), simplify = FALSE)
+  
+  alpha <- 1
+  beta <- 0.68
+  tau <- 0.75
+  trees <- replicate(n,  gen.thread.Gomez2013(n=100, alpha=alpha, beta=beta, tau=tau), simplify = FALSE)
+  
+  save(trees, file='trees.Rda')
+}
+
+TEST <- FALSE
+if(TEST){
   # Values reported in Gomze 2010 (Table 2)
   # Slashdot: 
   alpha.root <- 0.734
@@ -56,9 +103,17 @@ if(TRUE){
   alpha.c <- -1.684
   beta.root <- 0.794
   
+  trees <- replicate(4,  gen.thread.Gomez2011(n=100, alpha.root=alpha.root, alpha.c=alpha.c, beta.root=beta.root), simplify = FALSE)
+  
+  
+  alpha <- 1
+  beta <- 0.68
+  tau <- 0.75
+  trees <- replicate(4,  gen.thread.Gomez2013(n=100, alpha=alpha, beta=beta, tau=tau), simplify = FALSE)
+  
   par(mfrow=c(2,2))
-  for (i in 1:4){
-    g <- gen.thread(n=100, alpha.root=alpha.root, alpha.c=alpha.c, beta.root=beta.root)
+  for (i in 1:length(trees)){
+    g <- trees[[i]]
     root = which(degree(g, mode='out')==0)
     V(g)$color <- 'black'
     V(g)$color[root] <- 'red'
