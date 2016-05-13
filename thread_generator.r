@@ -59,7 +59,8 @@ gen.thread.Gomez2013 <- function(n=100, alpha=1, beta = 1, tau=0.75){
     # Add new vertex attached to the chosen node
     g <- add_vertices(g, 1)
     g <- add_edges(g, c(i,j))
-  } 
+  }
+  V(g)$user <- 1 # for compatibility with Lumbreras
   g
 }
 
@@ -124,7 +125,7 @@ if(FALSE){
   alpha <- 1
   beta <- 0.68
   tau <- 0.75
-  trees <- replicate(1000, gen.thread.Gomez2013(n=100, alpha=alpha, beta=beta, tau=tau), simplify = FALSE)
+  trees <- replicate(1, gen.thread.Gomez2013(n=5, alpha=alpha, beta=beta, tau=tau), simplify = FALSE)
 
   set.seed(1)
   alphas <- c(1,2,3)
