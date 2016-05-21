@@ -10,7 +10,7 @@ cost.function <- function(alpha, beta, tau){
 }
 
 
-update_responsabilities <- function(df.trees, u, alphas, betas, taus, pis){
+update_responsabilities <- function(df.trees, u, pis, alphas, betas, taus){
   # Compute E(z_uk) over the posterior distribution p(z_uk | X, theta)
   
   K <- length(alphas) # number of clusters
@@ -26,78 +26,63 @@ update_responsabilities <- function(df.trees, u, alphas, betas, taus, pis){
   responsabilities_u
 }
 
-update_pis <- function(responsabilities){
-  # Compute pi_k
-  pis <- rep(0,ncol(responsabilities))
-  for(k in 1:ncol(responsabilities)){
-    pis[k] <- sum(responsabilities[,k])/nrow(responsabilities)
-  }
-  pis
-}
 
 # Likelihood computation using the dataframe
 likelihood.post <- function(row, alpha, beta, tau){
-  log(alpha * row['popularity'] + beta*(row['parent']==1) + tau^row['lag']) - 
-    log(2*alpha*(row['t']-1)   + beta + tau*(tau^row['t']-1)/(tau-1))
+  c(as.matrix(log(alpha * row['popularity'] + beta*(row['parent']==1) + tau^row['lag']) - 
+    log(2*alpha*(row['t']-1)   + beta + tau*(tau^row['t']-1)/(tau-1))))
 }
 
 Qopt <- function(df.trees, responsabilities_k, pi_k, alpha, beta, tau){
   # sum of E[lnp(X,Z|\theta)] likelihoods for all clusters and all users
   # given the current responsabilities
   # Note that the optimizations can be done separatedly
-  total <- 0
-  for(i in 1:nrow(df.trees)){
-    row <- df.trees[i,]
-    u <- row$user
-    #like.post <- log(alpha * row['popularity'] + beta*(row['parent']==1) + tau^row['lag']) - 
-    #              log(2*alpha*(row['t']-1)   + beta + tau*(tau^row['t']-1)/(tau-1))
-    total <- total + c(as.matrix(responsabilities_k[u]*(likelihood.post(row, alpha, beta, tau) + log(pi_k))))
-  }
-  total
+  a <- responsabilities_k[df.trees$user]
+  b <- apply(df.trees, 1, function(x) likelihood.post(x, alpha, beta, tau) + log(pi_k))
+  sum(a*b)
 }
 
 # Wrapper for the optimization function
 # so that the only parameters are the ones to optimize
 cost.function <- function(params){
-  responsabilities_k <- responsabilities[,kk]
-  pi_k <- pis[kk]
-  -Qopt(df.trees, responsabilities_k, pi_k, alpha=params[1], beta=params[2], tau=params[3])
+  -1*Qopt(df.trees,  responsabilities[,k], pis[k], alpha=params[1], beta=params[2], tau=params[3])
 }
 
 
-em <-function(df.trees, alphas, betas, taus){
+EM <-function(df.trees, alphas, betas, taus){
   # Expectation-Maximizationo to find groups of users with different
   # alpha, beta, tau parameters
   # Arguments:
   #   trees: a list of igraph objects representing discussion threads
   #   alphas, betas, taus: initial assignment of users to clusters
-  nclusters <- length(alphas)
+  K <- length(alphas)
   users <- unique(df.trees$user)
   U <- length(users)
-  responsabilities <- matrix(nrow = U, ncol = nclusters)
   
+  responsabilities <- matrix(nrow = U, ncol = K)
   pis <- rep(1/ncol(responsabilities), ncol(responsabilities))
 
   # EXPECTATION
-  # Given the parameters of each cluster, find the best cluster for 
-  # each user (hard assignments, a la k-means, for now)
+  # Given the parameters of each cluster, find the responsability of each user in each cluster 
   #################################################################
-  #z <- sample(nclusters, length(users), replace=TRUE)
-  z <- c(1,2)
+  # (this can be parallelizable)
   for (u in 1:U){
-    responsabilities[u,] <- update_responsabilities(df.trees, u, alphas, betas, taus, pis)  
+    responsabilities[u,] <- update_responsabilities(df.trees, u, pis, alphas, betas, taus)  
   }
-  
-  pis <- update_pis(responsabilities)
-  
+
   # MAXIMIZATION
   # Given the current responsabilities and pis, find the best parameters for each cluster
   ################################################################
-  for(k in 1:nclusters){
-    kk <- k
-    sol <- fminsearch(fun = cost.function, x0 = c(alphas[kk],betas[kk],taus[kk]), verbose=TRUE)
+  #(this can be parallelizable)
+  for(k in 1:K){
+    sol <- fminsearch(fun = cost.function, x0 = c(alphas[k],betas[k],taus[k]), verbose=TRUE)
+    #alphas[k] <-
+    #betas[k] <-
+    #taus[k] <-
   }
   
+  # Update pis
+  pis <- colSums(responsabilities)/nrow(responsabilities)
   
   ###############################################################
   # EVALUATION OF FULL LIKELIHOOD p(X, Z | \theta)
@@ -107,11 +92,14 @@ em <-function(df.trees, alphas, betas, taus){
 if(TRUE){
   load('trees.Rda')
 
+  # Initialize parameters
   alphas <- c(1, 1.5, 2)
   betas <- c(0, 1, 2)
   taus <- c(0.25, 0.5, 0.75)
-  
+
+  # The first two posts of every thread are trivial since they have no choice
   df.trees <- filter(df.trees, t>2)
-  # Init the parameters rather than the z 
-  em(df.trees, alphas, betas, taus)
+  
+  # Expectation-Maximization
+  EM(df.trees, alphas, betas, taus)
 }
