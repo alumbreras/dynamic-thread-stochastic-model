@@ -125,7 +125,7 @@ if(FALSE){
   alpha <- 1
   beta <- 0.68
   tau <- 0.75
-  trees <- replicate(1, gen.thread.Gomez2013(n=5, alpha=alpha, beta=beta, tau=tau), simplify = FALSE)
+  trees <- replicate(100, gen.thread.Gomez2013(n=100, alpha=alpha, beta=beta, tau=tau), simplify = FALSE)
 
   set.seed(1)
   alphas <- c(1,2,3)
