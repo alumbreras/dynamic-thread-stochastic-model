@@ -1,106 +1,109 @@
-# Computes the likelihood of a graph according to our model
+# Compute likelihood of trees according to generative model and parameters
 # author: Alberto Lumbreras
-#############################
-# TODO: make this as fast as possible.
+###########################################################################
 
-parents.vector <- function(g){
-  # Build a vector representation of tree graph g
-  # where position i contains parent of i-th node
-  # See:
-  # Gomez, V., Kappen, H. J., Litvak, N., & Kaltenbrunner, A. (2012). 
-  # A likelihood-based framework for the analysis of discussion threads. World Wide Web (Vol. 16). 
-  # http://doi.org/10.1007/s11280-012-0162-8
-  nodes <- order(V(g)$date)[-1] # exclude root
-  parents <- get.edgelist(g, names=FALSE)[,2][nodes-1]
-  #parents <- unlist(adjacent_vertices(g, nodes, mode = c("out"))) #bottleneck
-  parents
-}
+library(dplyr)
+library(data.table)
+library(igraph)
+# Compute degrees only once for all trees (3-dimensional array: node, time, tree)
+#all.degrees <- list()
+#for (i in 1:length(trees)){
+#  parents <- get.edgelist(trees[[i]])[,2]
+#  size <- length(parents)+1
+#  all.degrees[[i]] <- t(sapply(2:size, function(t) tabulate(parents[1:t], nbins=size)))
+#}
 
-degrees.3 <- function(parents){
-  # Computes the degrees of every node using the parents vector
-  # (slower in long parent vectors)
-  degrees <- rep(0, length(parents)+1)
-  for(i in 1:length(degrees)){
-    degrees[parents[i]] <- degrees[parents[i]] + 1
-  }
-  degrees
-}
-
-degrees <- function(parents){
-  # Computes the degrees of every node using the parents vector
-  degrees <- hist(parents, plot=F, breaks=c(seq(0,length(parents)+1)))$counts
-  degrees
-}
-
-depths <- function(parents){
-  # Computes the depths of every node using the parents vector
-  # depth: depth = parentdepth + 1
-  depths <- rep(0, length(parents)+1)
-  for(i in 1:length(parents)){
-    depths[i+1] <- depths[parents[i]] + 1 # bottleneck
-  }
-  depths
-}
-
-likelihood <- function(params, trees) {
-  # Computes total likelihood of a graph
-  # given the parameters
-  #
-  # Args:
-  #   params: vector with alpha, beta and lambda parameters
-  #   g: observed graph
-  #
-  # Returns:
-  #   loglikelihood of the graph
-  alpha <- params[1]
-  beta <- params[2]
-  lambda <- params[3]
-  
-  # if only one tree, wrap it in a list
-  # so that next 'for' loop works fine
-  if(class(trees) == "igraph"){
-    trees <- list(g)
-  }
-  
-  total.like <- 0
-  for(i in 1:length(trees)){
+likelihood.Gomez2013 <- function(trees, alpha=1, beta = 1, tau = 0.75){
+  # Compute the likelihood of the whole set of trees
+  # Arguments:
+  #   trees: observed list of trees
+  #   alpha.root, alpha.c, beta.root: parameters of the model
+  like <- 0
+  for (i in 1:length(trees)){
     g <- trees[[i]]
-    parents <- parents.vector(g)
+    parents <- get.edgelist(g)[,2] # parents vector
     
-    # likelihood of every parent choice
-    like <- 0
-    for (t in 2:length(parents)){
-      h <- depths(parents[1:(t-1)])
-      d <- degrees.3(parents[1:(t-1)])
-      #tau <- t - as.numeric(V(G)$date[i]) # how old is the post
-      
-      probs <- (d+10e-5)^alpha * (h+10e-5)^beta #* taus^(-lambda) 
+    # skip root and first post
+    for(t in 2:length(parents)){
+      b <- rep(0,t)
+      b[1] <- beta
+      lags <- t:1
+      popularities <- 1 + tabulate(parents[1:(t-1)], nbins=t)
+      popularities[1] <- popularities[1] - 1 # root has no parent 
+      probs <- alpha*popularities + b + tau^lags
       probs <- probs/sum(probs)
       like <- like + log(probs[parents[t]])
     }
-    total.like <- total.like + like
   }
-  total.like
+  like
 }
 
-########################################
-# BENCHMARKS
-#######################################"
-if(TRUE){
-  library(utils)
-  Rprof(line.profiling=TRUE)
-  replicate(n=100, likelihood(c(1,1,1), g))
-  Rprof(NULL)
-  #summaryRprof(lines="both")
-  summaryRprof(lines="show")
+# Likelihood computation using the dataframe
+likelihood.post <- function(row, alpha, beta, tau){
+  log(alpha * row['popularity'] + beta*(row['parent']==1) + tau^row['lag']) - 
+  log(2*alpha*(row['t']-1)   + beta + tau*(tau^row['t']-1)/(tau-1))
 }
 
+likelihood.Gomez2013.df <- function(df.trees, alpha = 1, beta = 1, tau = 0.75){
+  # Likelihood using dataframe instead of list of trees
+  sum(apply(df.trees, 1, likelihood.post, alpha, beta, tau))
+}
 
-####################"
-library(microbenchmark)
+likelihood.Lumbreras2016.users <- function(df.trees, users, alpha, beta, tau){
+  # Compute the likelihood of the user posts given the parameters alpha, beta and tau
+  mask <- df.trees$user %in% users
+  sum(apply(df.trees[mask,], 1, likelihood.post, alpha, beta, tau))
+}  
 
-#t1 <- replicate(n=1000, system.time(degrees.1(pparents))[3])
-#t2 <- replicate(n=1000, system.time(degrees.2(pparents))[3])
 
+if(FALSE){
+  
+  alpha <- 1 # 1
+  beta <- 0.68 # 0.68
+  tau <- 0.75 # 0.75
+  
+  # Classic 
+  like <- likelihood.Gomez2013(trees, alpha = alpha, beta = beta, tau = tau)
+  cat('\n alpha: ', alpha)
+  cat('\n beta: ', beta)
+  cat('\n tau:', tau)
+  cat('\n Total likelihood: ', like)
+  
+  # Using preprocessed dataframes
+  df.trees_ <- filter(df.trees, t>1)
+  like <- likelihood.Gomez2013.df(df.trees_, alpha = alpha, beta = beta, tau = tau)
+  cat('\n alpha: ', alpha)
+  cat('\n beta: ', beta)
+  cat('\n tau:', tau)
+  cat('\n Total likelihood: ', like)
+  
+  # Using preprocessed dataframes + cluster by cluster
+  alphas <- c(1,2)
+  betas <- c(0.68,0.75) 
+  taus <- c(0.75, 0.75)
+  users <- unique(df.trees$user)
+  z <- c(1,1)
+  
+  # this is parallelizable
+  like <- 0
+  z.nonempty <- unique(z)
+  for (i in 1:length(z.nonempty)){
+    like <- like + likelihood.Lumbreras2016.users(df.trees_, 
+                                                  which(z==z.nonempty[i]), 
+                                                  alphas[z.nonempty[i]], 
+                                                  betas[z.nonempty[i]], 
+                                                  taus[z.nonempty[i]])
+  }
+  cat('\n Total likelihood: ', like)
+  
+  library(rbenchmark)
+  benchmark(likelihood.Gomez2013(trees, alpha = alpha, beta = beta, tau = tau),
+            likelihood.Gomez2013.df(df.trees_, alpha = alpha, beta = beta, tau = tau),
+            likelihood.Lumbreras2016.users(df.trees_, 
+                                           which(z==z.nonempty[1]), 
+                                           alphas[z.nonempty[1]], 
+                                           betas[z.nonempty[1]], 
+                                           taus[z.nonempty[1]]))
+  
+}
 
-#microbenchmark(depths.1(parents), depths.2(parents))
