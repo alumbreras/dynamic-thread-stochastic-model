@@ -41,7 +41,10 @@ likelihood.Gomez2013 <- function(trees, alpha=1, beta = 1, tau = 0.75){
 # Likelihood computation using the dataframe
 likelihood.post <- function(row, alpha, beta, tau){
   log(alpha * row['popularity'] + beta*(row['parent']==1) + tau^row['lag']) - 
-  log(2*alpha*(row['t']-1)   + beta + tau*(tau^row['t']-1)/(tau-1))
+  log(2*alpha*(row['t']-1/2)   + beta + tau*(tau^row['t']-1)/(tau-1))
+  # -1/2 because root has at least degree 1 (to follow Gomez 2013)
+  # if the root starts with degree 0, then it should be:
+  # log(2*alpha*(row['t']-1)   + beta + tau*(tau^row['t']-1)/(tau-1))
 }
 
 likelihood.Gomez2013.df <- function(df.trees, alpha = 1, beta = 1, tau = 0.75){
