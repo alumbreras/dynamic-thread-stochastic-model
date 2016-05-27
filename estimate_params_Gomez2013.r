@@ -11,9 +11,9 @@ source('R/likelihood.r')
 ###############
 # generate N trees with fixed parameters
 ###############
-N <- 50
+N <- 5000
 alpha <- 1
-beta <- 0.68
+beta <- 0.68 #TODO: estimation gives me 1.66, while alpha and tau are ok. Check it...
 tau <- 0.75 
 trees <- replicate(N, gen.thread.Gomez2013(n=25, alpha=alpha, beta=beta, tau=tau), simplify = FALSE)
 

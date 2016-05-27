@@ -51,7 +51,7 @@ gen.thread.Gomez2013 <- function(n=100, alpha=1, beta = 1, tau=0.75){
   for (i in 3:n){
     betas <- c(beta, rep(0, i-2))
     lags <- (i-1):1
-    popularities <- 1 + degree(g, mode="in")
+    popularities <- 1 + degree(g, mode="in") # even root starts with degree 1
     
     # Probability of choosing every node (only one is chosen)
     probs <- alpha*popularities + betas + tau^lags
@@ -95,7 +95,7 @@ gen.thread.Lumbreras2016 <- function(n=100, z=c(1,2,3), alphas = c(1,2,3), betas
     
     bs <- c(beta, rep(0, i-2))
     lags <- (i-1):1
-    popularities <- 1 + degree(g, mode="in")
+    popularities <- 1 + degree(g, mode="in") # even root starts with degree 1
     
     # Probability of choosing every node (only one is chosen)
     probs <- alpha*popularities + bs + tau^lags
@@ -118,7 +118,7 @@ tree.to.data <- function(g, thread=0){
   parents <- get.edgelist(g)[,2] # parents vector without the first two posts
   authors <- V(g)$user[-1] # remove first post
   popularities <- c(1,sapply(2:length(parents), function(t) 1 + sum(parents[1:(t-1)]==parents[t])))
-  popularities[parents==1] <- popularities[parents==1]-1 # the root node has no parent
+  #popularities[parents==1] <- popularities[parents==1]-1 # the root node has no parent
   posts <- 2:(length(parents)+1)
   data <- data.frame(thread = rep(thread, length(posts)),
                      user = authors,
