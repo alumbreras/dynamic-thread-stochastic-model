@@ -16,7 +16,8 @@ df.errors <- data.frame(alpha=rep(NA,100*4),
                         alpha_hat=rep(NA,100*4),
                         beta_hat=rep(NA,100*4),
                         tau_hat=rep(NA,100*4),
-                        N = rep(NA,100*4))
+                        N = rep(NA,100*4),
+                        like = rep(NA,100*4))
 
 # Repeat the experiment with different parameters to see error mean and variance
 ncores <- detectCores() - 2
@@ -80,11 +81,12 @@ for (j in 1:length(N.list)){
                 lower = c(0,0,0), upper = c(Inf, Inf, 1), 
                 control = list(maximize=TRUE),
                 df.trees = df.trees)
+    cat('\n', alpha, " ", beta, " ", tau)
     cat('\n', sol$par)
     
     # Store results
     #################
-    df.errors[row,] <- c(alpha, beta, tau, sol$par[1], sol$par[2], sol$par[3], N)
+    df.errors[row,] <- c(alpha, beta, tau, sol$par[1], sol$par[2], sol$par[3], N, sol$value)
     row <- row + 1
   }
 }
